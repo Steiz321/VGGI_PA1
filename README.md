@@ -2,4 +2,4 @@
 
 ## Corrugated Sphere with Texture Mapping
 
-![Textured Corrugated Sphere](./pictures/phong_shading.jpg)
+![Textured Corrugated Sphere](./pictures/texturing.jpg)
