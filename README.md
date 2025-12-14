@@ -1,5 +1,5 @@
-# Practical assignment 1
+# Practical assignment 2
 
-# Corrugated sphere
+# Corrugated sphere (Phong shading)
 
-![Image alt](./pictures/corrugated_shpere.jpg)
+![Image alt](./pictures/phong_shading.jpg)
