@@ -1,41 +1,62 @@
 <!DOCTYPE html>
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
+    <title>PA#2</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: black;
+        color: #f0f0f0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+        min-height: 100vh;
+      }
+      .slider-container {
+        display: flex;
+        gap: 20px;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        align-items: center;
+      }
+      label {
+        margin-right: 5px;
+      }
+    </style>
 
-<title>PA#1</title>
-<style>
+    <script src="./Utils/trackball-rotator.js"></script>
+    <script src="./Utils/m4.js"></script>
+    <script src="./shader.gpu"></script>
+    <script src="./main.js"></script>
+  </head>
+  <body onload="init()">
+    <h2>Corrugated Sphere with Phong Shading</h2>
 
+    <p id="message">
+      Drag mouse to rotate. Use sliders to change surface granularity.
+    </p>
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: black; 
-            color: #f0f0f0; 
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-            min-height: 100vh;
-        }
+    <div class="slider-container">
+      <div>
+        <label for="u-slider">U gran:</label>
+        <input type="range" id="u-slider" min="2" max="100" value="20" />
+      </div>
+      <div>
+        <label for="v-slider">V gran:</label>
+        <input type="range" id="v-slider" min="2" max="100" value="30" />
+      </div>
+    </div>
 
-</style>
-
-<script src="./Utils/trackball-rotator.js"></script>
-<script src="./Utils/m4.js"></script>
-<script src="./shader.gpu"></script>
-<script src="./main.js"></script>
-
-</head>
-<body onload="init()">
-
-<h2>A Cube with "Trackball" Mouse Rotation</h2>
-
-<p id="message">Drag your mouse on the cube to rotate it.<br>
-(On a touch screen, you can use your finger.)</p>
-
-
-<div id="canvas-holder">
-   <canvas width="600" height="600" id="webglcanvas" style="background-color:red"></canvas>
-</div>
-
-
-</body></html>
+    <div id="canvas-holder">
+      <canvas
+        width="600"
+        height="600"
+        id="webglcanvas"
+        style="background-color: black"
+      ></canvas>
+    </div>
+  </body>
+</html>

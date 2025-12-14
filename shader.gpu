@@ -1,24 +1,51 @@
-
-
 // Vertex shader
 const vertexShaderSource = `
-attribute vec3 vertex;
-uniform mat4 ModelViewProjectionMatrix;
+    attribute vec3 vertex;
+    attribute vec3 normal;
 
-void main() {
-    gl_Position = ModelViewProjectionMatrix * vec4(vertex,1.0);
-}`;
+    uniform mat4 ModelViewMatrix;
+    uniform mat4 ProjectionMatrix;
+    uniform mat4 NormalMatrix;
 
+    varying vec3 v_world_position;
+    varying vec3 v_transformed_normal;
+
+    void main() {
+        vec4 world_position = ModelViewMatrix * vec4(vertex, 1.0);
+        v_world_position = world_position.xyz;
+        v_transformed_normal = (NormalMatrix * vec4(normal, 1.0)).xyz;
+        gl_Position = ProjectionMatrix * world_position;
+    }
+`;
 
 // Fragment shader
 const fragmentShaderSource = `
-#ifdef GL_FRAGMENT_PRECISION_HIGH
-   precision highp float;
-#else
-   precision mediump float;
-#endif
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+       precision highp float;
+    #else
+       precision mediump float;
+    #endif
 
-uniform vec4 color;
-void main() {
-    gl_FragColor = color;
-}`;
+    varying vec3 v_world_position;
+    varying vec3 v_transformed_normal;
+
+    uniform vec3 light_position;
+    uniform vec4 color;
+
+    void main() {
+        vec3 ambient_light = vec3(0.2, 0.2, 0.2);
+
+        vec3 light_direction = normalize(light_position - v_world_position);
+        vec3 normal = normalize(v_transformed_normal);
+        float diff = max(dot(normal, light_direction), 0.0);
+        vec3 diffuse_light = diff * vec3(1.0, 1.0, 1.0);
+
+        vec3 view_direction = normalize(-v_world_position);
+        vec3 reflect_direction = reflect(-light_direction, normal);
+        float spec = pow(max(dot(view_direction, reflect_direction), 0.0), 32.0);
+        vec3 specular_light = spec * vec3(1.0, 1.0, 1.0);
+
+        vec3 final_light = ambient_light + diffuse_light + specular_light;
+        gl_FragColor = vec4(color.rgb * final_light, color.a);
+    }
+`;
