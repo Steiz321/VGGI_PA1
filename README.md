@@ -1,5 +1,5 @@
-# Practical assignment 2
+# Practical Assignment 3 - Texturing (Control assignment)
 
-# Corrugated sphere (Phong shading)
+## Corrugated Sphere with Texture Mapping
 
-![Image alt](./pictures/phong_shading.jpg)
+![Textured Corrugated Sphere](./pictures/phong_shading.jpg)

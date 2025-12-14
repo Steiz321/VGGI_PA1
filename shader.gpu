@@ -1,7 +1,10 @@
-// Vertex shader
+// Vertex shader with texture support
 const vertexShaderSource = `
     attribute vec3 vertex;
     attribute vec3 normal;
+    attribute vec2 texCoord;
+    attribute vec3 tangent;
+    attribute vec3 bitangent;
 
     uniform mat4 ModelViewMatrix;
     uniform mat4 ProjectionMatrix;
@@ -9,16 +12,22 @@ const vertexShaderSource = `
 
     varying vec3 v_world_position;
     varying vec3 v_transformed_normal;
+    varying vec2 v_texCoord;
+    varying vec3 v_tangent;
+    varying vec3 v_bitangent;
 
     void main() {
         vec4 world_position = ModelViewMatrix * vec4(vertex, 1.0);
         v_world_position = world_position.xyz;
         v_transformed_normal = (NormalMatrix * vec4(normal, 1.0)).xyz;
+        v_tangent = (NormalMatrix * vec4(tangent, 1.0)).xyz;
+        v_bitangent = (NormalMatrix * vec4(bitangent, 1.0)).xyz;
+        v_texCoord = texCoord;
         gl_Position = ProjectionMatrix * world_position;
     }
 `;
 
-// Fragment shader
+// Fragment shader with texture mapping and normal mapping
 const fragmentShaderSource = `
     #ifdef GL_FRAGMENT_PRECISION_HIGH
        precision highp float;
@@ -28,24 +37,51 @@ const fragmentShaderSource = `
 
     varying vec3 v_world_position;
     varying vec3 v_transformed_normal;
+    varying vec2 v_texCoord;
+    varying vec3 v_tangent;
+    varying vec3 v_bitangent;
 
     uniform vec3 light_position;
-    uniform vec4 color;
+    uniform sampler2D diffuseTexture;
+    uniform sampler2D specularTexture;
+    uniform sampler2D normalTexture;
 
     void main() {
+        // Sample textures
+        vec3 diffuseColor = texture2D(diffuseTexture, v_texCoord).rgb;
+        float specularIntensity = texture2D(specularTexture, v_texCoord).r;
+        vec3 normalMap = texture2D(normalTexture, v_texCoord).rgb;
+        
+        // Convert normal map from [0,1] to [-1,1]
+        vec3 tangentNormal = normalize(normalMap * 2.0 - 1.0);
+        
+        // Gram-Schmidt orthogonalization with TANGENT PRIORITY
+        vec3 T = normalize(v_tangent);
+        vec3 N = normalize(v_transformed_normal);
+        // Re-orthogonalize: remove tangent component from normal
+        N = normalize(N - dot(N, T) * T);
+        vec3 B = normalize(cross(T, N));
+        
+        // Construct TBN matrix and transform normal to world space
+        mat3 TBN = mat3(T, B, N);
+        vec3 normal = normalize(TBN * tangentNormal);
+        
+        // Ambient lighting
         vec3 ambient_light = vec3(0.2, 0.2, 0.2);
-
+        
+        // Diffuse lighting (modulated by diffuse texture)
         vec3 light_direction = normalize(light_position - v_world_position);
-        vec3 normal = normalize(v_transformed_normal);
         float diff = max(dot(normal, light_direction), 0.0);
-        vec3 diffuse_light = diff * vec3(1.0, 1.0, 1.0);
-
+        vec3 diffuse_light = diff * vec3(1.0, 1.0, 1.0) * diffuseColor;
+        
+        // Specular lighting (modulated by specular texture)
         vec3 view_direction = normalize(-v_world_position);
         vec3 reflect_direction = reflect(-light_direction, normal);
         float spec = pow(max(dot(view_direction, reflect_direction), 0.0), 32.0);
-        vec3 specular_light = spec * vec3(1.0, 1.0, 1.0);
-
+        vec3 specular_light = spec * vec3(1.0, 1.0, 1.0) * specularIntensity;
+        
+        // Combine lighting
         vec3 final_light = ambient_light + diffuse_light + specular_light;
-        gl_FragColor = vec4(color.rgb * final_light, color.a);
+        gl_FragColor = vec4(final_light, 1.0);
     }
 `;

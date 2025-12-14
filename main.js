@@ -8,6 +8,11 @@ let uSlider, vSlider; // Sliders for granularity
 let light_rotation_angle = 0;
 let lastTime = 0;
 
+// Textures
+let diffuseTexture;
+let specularTexture;
+let normalTexture;
+
 function deg2rad(angle) {
   return (angle * Math.PI) / 180;
 }
@@ -17,15 +22,38 @@ function Model(name) {
   this.name = name;
   this.iVertexBuffer = gl.createBuffer();
   this.iNormalBuffer = gl.createBuffer();
+  this.iTexCoordBuffer = gl.createBuffer();
+  this.iTangentBuffer = gl.createBuffer();
+  this.iBitangentBuffer = gl.createBuffer();
   this.iIndexBuffer = gl.createBuffer();
   this.count = 0;
 
-  this.BufferData = function (vertices, normals, indices) {
+  this.BufferData = function (
+    vertices,
+    normals,
+    texCoords,
+    tangents,
+    bitangents,
+    indices
+  ) {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.iNormalBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STREAM_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.iTexCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texCoords), gl.STREAM_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.iTangentBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(tangents), gl.STREAM_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.iBitangentBuffer);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array(bitangents),
+      gl.STREAM_DRAW
+    );
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.iIndexBuffer);
     gl.bufferData(
@@ -46,6 +74,25 @@ function Model(name) {
     gl.vertexAttribPointer(shProgram.iAttribNormal, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(shProgram.iAttribNormal);
 
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.iTexCoordBuffer);
+    gl.vertexAttribPointer(shProgram.iAttribTexCoord, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(shProgram.iAttribTexCoord);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.iTangentBuffer);
+    gl.vertexAttribPointer(shProgram.iAttribTangent, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(shProgram.iAttribTangent);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.iBitangentBuffer);
+    gl.vertexAttribPointer(
+      shProgram.iAttribBitangent,
+      3,
+      gl.FLOAT,
+      false,
+      0,
+      0
+    );
+    gl.enableVertexAttribArray(shProgram.iAttribBitangent);
+
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.iIndexBuffer);
     gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_SHORT, 0);
   };
@@ -56,11 +103,16 @@ function ShaderProgram(name, program) {
   this.prog = program;
   this.iAttribVertex = -1;
   this.iAttribNormal = -1;
+  this.iAttribTexCoord = -1;
+  this.iAttribTangent = -1;
+  this.iAttribBitangent = -1;
   this.iModelViewMatrix = -1;
   this.iProjectionMatrix = -1;
   this.iNormalMatrix = -1;
   this.iLightPos = -1;
-  this.iColor = -1;
+  this.iDiffuseTexture = -1;
+  this.iSpecularTexture = -1;
+  this.iNormalTexture = -1;
 
   this.Use = function () {
     gl.useProgram(this.prog);
@@ -92,7 +144,18 @@ function draw() {
   const z = radius * Math.sin(light_rotation_angle);
   gl.uniform3fv(shProgram.iLightPos, [x, 3.0, z]);
 
-  gl.uniform4fv(shProgram.iColor, [1, 1, 0, 1]);
+  // Bind textures
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, diffuseTexture);
+  gl.uniform1i(shProgram.iDiffuseTexture, 0);
+
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, specularTexture);
+  gl.uniform1i(shProgram.iSpecularTexture, 1);
+
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_2D, normalTexture);
+  gl.uniform1i(shProgram.iNormalTexture, 2);
 
   surface.Draw();
 }
@@ -112,13 +175,16 @@ function animate(time) {
 function CreateSurfaceData(u_lines, v_lines) {
   let vertexList = [];
   let normalList = [];
+  let texCoordList = [];
+  let tangentList = [];
+  let bitangentList = [];
   let indicesList = [];
 
-  const R0 = 1.5;
+  const R0 = 1.0;
   const A = 0.05;
   const k = 15;
   const m = 15;
-  const num_segments = 50;
+
   function get_corrugated_sphere_coords(theta, phi) {
     let R = R0 + A * Math.sin(k * theta) * Math.cos(m * phi);
     let x = R * Math.sin(theta) * Math.cos(phi);
@@ -126,8 +192,10 @@ function CreateSurfaceData(u_lines, v_lines) {
     let z = R * Math.cos(theta);
     return [x, y, z];
   }
+
   const du = 0.001;
   const dv = 0.001;
+
   // Function to compute the normal vector at a point (theta, phi)
   function get_normal(theta, phi) {
     // Approximate partial derivatives using central differences
@@ -146,14 +214,56 @@ function CreateSurfaceData(u_lines, v_lines) {
     let normal = m4.cross(dP_du, dP_dv);
     return m4.normalize(normal);
   }
+
+  // Function to compute tangent vector (derivative with respect to phi)
+  function get_tangent(theta, phi) {
+    let P_v_plus = get_corrugated_sphere_coords(theta, phi + dv);
+    let P_v_minus = get_corrugated_sphere_coords(theta, phi - dv);
+    let dP_dv = m4
+      .subtractVectors(P_v_plus, P_v_minus)
+      .map((c) => c / (2 * dv));
+    return m4.normalize(dP_dv);
+  }
+
+  // Generate vertices, normals, UV coords, tangents, and bitangents
   for (let i = 0; i <= u_lines; i++) {
     let theta = (i * Math.PI) / u_lines;
     for (let j = 0; j <= v_lines; j++) {
       let phi = (j * 2 * Math.PI) / v_lines;
+
       let coords = get_corrugated_sphere_coords(theta, phi);
       vertexList.push(...coords);
+
+      // Normal
       let normal = get_normal(theta, phi);
       normalList.push(...normal);
+
+      // UV coordinates (spherical mapping)
+      let u = j / v_lines;
+      let v = i / u_lines;
+      texCoordList.push(u, v);
+
+      // Tangent
+      let tangent = get_tangent(theta, phi);
+
+      // Gram-Schmidt orthogonalization with TANGENT PRIORITY
+      let T = tangent;
+      let N = normal;
+
+      // Remove tangent component from normal
+      let dotTN = m4.dot(T, N);
+      let N_orthogonal = m4.subtractVectors(
+        N,
+        T.map((t) => t * dotTN)
+      );
+      N_orthogonal = m4.normalize(N_orthogonal);
+
+      // Bitangent = cross(tangent, normal)
+      let bitangent = m4.cross(T, N_orthogonal);
+      bitangent = m4.normalize(bitangent);
+
+      tangentList.push(...T);
+      bitangentList.push(...bitangent);
     }
   }
 
@@ -171,6 +281,9 @@ function CreateSurfaceData(u_lines, v_lines) {
   return {
     vertices: vertexList,
     normals: normalList,
+    texCoords: texCoordList,
+    tangents: tangentList,
+    bitangents: bitangentList,
     indices: indicesList,
   };
 }
@@ -182,6 +295,9 @@ function updateSurface() {
   surface.BufferData(
     surfaceData.vertices,
     surfaceData.normals,
+    surfaceData.texCoords,
+    surfaceData.tangents,
+    surfaceData.bitangents,
     surfaceData.indices
   );
   draw();
@@ -190,16 +306,21 @@ function updateSurface() {
 function initGL() {
   let prog = createProgram(gl, vertexShaderSource, fragmentShaderSource);
 
-  shProgram = new ShaderProgram("Phong", prog);
+  shProgram = new ShaderProgram("Textured Phong", prog);
   shProgram.Use();
 
   shProgram.iAttribVertex = gl.getAttribLocation(prog, "vertex");
   shProgram.iAttribNormal = gl.getAttribLocation(prog, "normal");
+  shProgram.iAttribTexCoord = gl.getAttribLocation(prog, "texCoord");
+  shProgram.iAttribTangent = gl.getAttribLocation(prog, "tangent");
+  shProgram.iAttribBitangent = gl.getAttribLocation(prog, "bitangent");
   shProgram.iModelViewMatrix = gl.getUniformLocation(prog, "ModelViewMatrix");
   shProgram.iProjectionMatrix = gl.getUniformLocation(prog, "ProjectionMatrix");
   shProgram.iNormalMatrix = gl.getUniformLocation(prog, "NormalMatrix");
   shProgram.iLightPos = gl.getUniformLocation(prog, "light_position");
-  shProgram.iColor = gl.getUniformLocation(prog, "color");
+  shProgram.iDiffuseTexture = gl.getUniformLocation(prog, "diffuseTexture");
+  shProgram.iSpecularTexture = gl.getUniformLocation(prog, "specularTexture");
+  shProgram.iNormalTexture = gl.getUniformLocation(prog, "normalTexture");
 
   surface = new Model("Surface");
   const surfaceData = CreateSurfaceData(
@@ -209,10 +330,16 @@ function initGL() {
   surface.BufferData(
     surfaceData.vertices,
     surfaceData.normals,
+    surfaceData.texCoords,
+    surfaceData.tangents,
+    surfaceData.bitangents,
     surfaceData.indices
   );
 
   gl.enable(gl.DEPTH_TEST);
+
+  // Load textures
+  loadTextures();
 }
 
 function createProgram(gl, vShader, fShader) {
@@ -236,6 +363,57 @@ function createProgram(gl, vShader, fShader) {
     throw new Error("Link error in program:  " + gl.getProgramInfoLog(prog));
   }
   return prog;
+}
+
+// Helper function to load a single texture
+function loadTexture(url) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+
+  // Fill with a temporary 1x1 pixel while loading
+  const pixel = new Uint8Array([128, 128, 255, 255]); // Blue-ish for normal maps
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGBA,
+    1,
+    1,
+    0,
+    gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    pixel
+  );
+
+  const image = new Image();
+  image.onload = function () {
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+
+    // Check if image is power of 2
+    if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+      gl.generateMipmap(gl.TEXTURE_2D);
+    } else {
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }
+
+    draw(); // Redraw once texture is loaded
+  };
+  image.src = url;
+
+  return texture;
+}
+
+function isPowerOf2(value) {
+  return (value & (value - 1)) === 0;
+}
+
+// Load all textures
+function loadTextures() {
+  diffuseTexture = loadTexture("./textures/diffuse.png");
+  specularTexture = loadTexture("./textures/specular.png");
+  normalTexture = loadTexture("./textures/normal.png");
 }
 
 function init() {
