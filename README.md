@@ -1,5 +1,5 @@
-# Practical Assignment 3 - Texturing (Control assignment)
+# Calculation and graphics work - Operations on texture coordinates
 
 ## Corrugated Sphere with Texture Mapping
 
-![Textured Corrugated Sphere](./pictures/texturing.jpg)
+![Textured Corrugated Sphere](./pictures/texture_scaling.jpg)

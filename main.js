@@ -13,6 +13,11 @@ let diffuseTexture;
 let specularTexture;
 let normalTexture;
 
+let texPivot = [0.5, 0.5]; // center (u,v)
+let texScale = 1.0; // odd variants => scaling
+const PIVOT_STEP = 0.01;
+const SCALE_STEP = 0.05;
+
 function deg2rad(angle) {
   return (angle * Math.PI) / 180;
 }
@@ -156,6 +161,9 @@ function draw() {
   gl.activeTexture(gl.TEXTURE2);
   gl.bindTexture(gl.TEXTURE_2D, normalTexture);
   gl.uniform1i(shProgram.iNormalTexture, 2);
+
+  gl.uniform2fv(shProgram.iTexPivot, texPivot);
+  gl.uniform1f(shProgram.iTexScale, texScale);
 
   surface.Draw();
 }
@@ -321,6 +329,12 @@ function initGL() {
   shProgram.iDiffuseTexture = gl.getUniformLocation(prog, "diffuseTexture");
   shProgram.iSpecularTexture = gl.getUniformLocation(prog, "specularTexture");
   shProgram.iNormalTexture = gl.getUniformLocation(prog, "normalTexture");
+  shProgram.iTexPivot = gl.getUniformLocation(prog, "u_texPivot");
+  shProgram.iTexScale = gl.getUniformLocation(prog, "u_texScale");
+
+  // стартові значення
+  gl.uniform2fv(shProgram.iTexPivot, texPivot);
+  gl.uniform1f(shProgram.iTexScale, texScale);
 
   surface = new Model("Surface");
   const surfaceData = CreateSurfaceData(
@@ -426,6 +440,36 @@ function init() {
   try {
     canvas = document.getElementById("webglcanvas");
     gl = canvas.getContext("webgl");
+    window.addEventListener("keydown", (e) => {
+      const k = e.key.toLowerCase();
+
+      if (k === "a") texPivot[0] -= PIVOT_STEP;
+      if (k === "d") texPivot[0] += PIVOT_STEP;
+      if (k === "w") texPivot[1] += PIVOT_STEP;
+      if (k === "s") texPivot[1] -= PIVOT_STEP;
+
+      if (k === "q") texScale = Math.max(0.1, texScale - SCALE_STEP);
+      if (k === "e") texScale = Math.min(5.0, texScale + SCALE_STEP);
+
+      if (k === "r") {
+        texPivot = [0.5, 0.5];
+        texScale = 1.0;
+      }
+
+      // clamp pivot to [0..1]
+      texPivot[0] = Math.min(1, Math.max(0, texPivot[0]));
+      texPivot[1] = Math.min(1, Math.max(0, texPivot[1]));
+
+      // refresh page text
+      const el = document.getElementById("tex-info");
+      if (el)
+        el.textContent = `Pivot (u,v): ${texPivot[0].toFixed(
+          2
+        )}, ${texPivot[1].toFixed(2)} | Scale: ${texScale.toFixed(2)}`;
+
+      e.preventDefault();
+    });
+
     if (!gl) {
       throw "Browser does not support WebGL";
     }

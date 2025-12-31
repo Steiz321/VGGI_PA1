@@ -3,7 +3,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 
-    <title>PA#3 - Texturing</title>
+    <title>PA#4 - CGW</title>
     <style>
       body {
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
@@ -33,7 +33,7 @@
     <script src="./main.js"></script>
   </head>
   <body onload="init()">
-    <h2>Corrugated Sphere with Texture Mapping (PA#3)</h2>
+    <h2>Corrugated Sphere with Texture Scaling(PA#4)</h2>
 
     <p id="message">
       Drag mouse to rotate. Use sliders to change surface granularity.
@@ -48,6 +48,14 @@
         <label for="v-slider">V gran:</label>
         <input type="range" id="v-slider" min="2" max="100" value="30" />
       </div>
+    </div>
+
+    <div id="tex-info" style="margin-top: 10px; font-family: monospace">
+      Pivot (u,v): 0.50, 0.50 | Scale: 1.00
+    </div>
+
+    <div style="margin-top: 8px; font-family: monospace; opacity: 0.8">
+      Controls: A/D/W/S pivot, Q/E scale, R reset
     </div>
 
     <div id="canvas-holder">
